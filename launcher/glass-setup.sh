@@ -8,20 +8,32 @@ ADB=${ADB:-adb}
 FILES=/sdcard/Android/data/tv.dumbtv.home/files
 pkgs=$("$ADB" shell pm list packages | tr -d '\r' | sed 's/^package://')
 
-pick() { # first installed package matching any of the regexes, in order
+pick() { # first installed package matching each regex in turn; prints nothing when none does
   for re in "$@"; do
-    hit=$(grep -E -m1 "$re" <<<"$pkgs" || true)
-    [[ -n $hit ]] && { echo "$hit"; return; }
+    hit=$(grep -E -i -m1 "$re" <<<"$pkgs" || true)
+    if [[ -n $hit ]]; then echo "$hit"; return 0; fi
   done
+  return 0
 }
 dock=()
-for want in "^com\.amazon\.firetv\.youtube$|^com\.google\.android\.youtube\.tv$" \
-            "^com\.netflix\.ninja$" \
-            "^com\.amazon\.avod$|^com\.amazon\.avod\.thirdpartyclient$" \
-            "f1tv|formula1|\.f1\."; do
-  p=$(pick "$want")
-  if [[ -n $p ]]; then dock+=("$p"); else echo "not found: $want"; fi
+missing=0
+names=(YouTube Netflix "Prime Video" F1)
+wants=("^com\.amazon\.firetv\.youtube$|^com\.google\.android\.youtube\.tv$|youtube\.tv$|firetv\.youtube|youtube"
+       "^com\.netflix\.ninja$|netflix"
+       "^com\.amazon\.avod$|^com\.amazon\.avod\.thirdpartyclient$|avod"
+       "f1tv|formula1|formula|\.f1")
+for i in 0 1 2 3; do
+  p=$(pick "${wants[$i]}")
+  if [[ -n $p ]]; then
+    dock+=("$p"); echo "${names[$i]}: $p"
+  else
+    echo "${names[$i]}: not found"; missing=1
+  fi
 done
+if [[ $missing == 1 ]]; then
+  echo "your installed apps (send this list if one of the four is missing):"
+  "$ADB" shell pm list packages -3 | tr -d '\r' | sed 's/^package:/  /'
+fi
 order=$(IFS=,; echo "${dock[*]}")
 echo "dock: $order"
 
