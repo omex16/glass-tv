@@ -20,8 +20,8 @@ missing=0
 names=(YouTube Netflix "Prime Video" F1)
 wants=("^com\.amazon\.firetv\.youtube$|^com\.google\.android\.youtube\.tv$|youtube\.tv$|firetv\.youtube|youtube"
        "^com\.netflix\.ninja$|netflix"
-       "^com\.amazon\.avod$|^com\.amazon\.avod\.thirdpartyclient$|avod"
-       "f1tv|formula1|formula|\.f1")
+       "^com\.amazon\.firebat$|^com\.amazon\.avod$|^com\.amazon\.avod\.thirdpartyclient$|avod"
+       "f1tv|formula1|formulaone|formula|\.f1")
 for i in 0 1 2 3; do
   p=$(pick "${wants[$i]}")
   if [[ -n $p ]]; then
