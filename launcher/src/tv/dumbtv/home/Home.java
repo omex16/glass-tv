@@ -190,11 +190,11 @@ public final class Home extends Activity {
 
         /** Whichever container currently holds the tiles, following Options › Layout. */
         ViewGroup tiles() {
-            return "grid".equals(cfg.get(Config.LAYOUT)) ? grid : strip;
+            return gridMode() ? grid : strip;
         }
 
         void setVisible(boolean on) {
-            boolean gridMode = "grid".equals(cfg.get(Config.LAYOUT));
+            boolean gridMode = gridMode();
             boolean dock = Catalog.APPS.equals(kind) && "on".equals(cfg.get(Config.GLASS));
             title.setVisibility(on && !dock ? View.VISIBLE : View.GONE);
             scroll.setVisibility(on && !gridMode ? View.VISIBLE : View.GONE);
@@ -810,23 +810,30 @@ public final class Home extends Activity {
         return "on".equals(cfg.get(Config.GLASS));
     }
 
-    /** Glass look: a frosted band behind the apps row (or grid), like the Apple TV dock. */
+    /** Options › Layout › Grid; the Glass look is always a grid: the dock line, then the rest. */
+    private boolean gridMode() {
+        return glass() || "grid".equals(cfg.get(Config.LAYOUT));
+    }
+
+    /**
+     * Glass look: four tiles to a line, centred. The dock line sits in a frosted band that hugs
+     * it; the rest of the apps line up under it in the same four columns.
+     */
     private void dock(boolean glass) {
-        int side = dp(36);
-        for (View v : new View[] {apps.scroll, apps.grid}) {
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
-            lp.leftMargin = glass ? side : 0;
-            lp.rightMargin = glass ? side : 0;
-            lp.topMargin = glass ? dp(14) : 0;
-            v.setLayoutParams(lp);
-            v.setBackground(glass ? Ui.glass(this, 0x1CFFFFFF, 0x2EFFFFFF, dp(30)) : null);
-        }
-        int edge = dp(56), bleed = dp(14);
-        apps.scroll.setPadding(glass ? edge - bleed - side : edge - bleed, 0,
-                glass ? edge - bleed - side : edge - bleed, 0);
-        apps.strip.setPadding(bleed, dp(glass ? 22 : 12), bleed, dp(glass ? 14 : 8));
-        apps.grid.setPadding(glass ? edge - side : edge, dp(glass ? 22 : 12),
-                glass ? edge - side : edge, dp(glass ? 14 : 8));
+        int edge = dp(56), bleed = dp(14), inner = dp(28);
+        int screen = getResources().getDisplayMetrics().widthPixels;
+        int content = 4 * cardSize()[0] + 3 * dp(18);
+        int side = Math.max(edge, (screen - content) / 2);
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) apps.grid.getLayoutParams();
+        lp.leftMargin = glass ? side - inner : 0;
+        lp.rightMargin = glass ? side - inner : 0;
+        lp.topMargin = glass ? dp(14) : 0;
+        apps.grid.setLayoutParams(lp);
+        apps.grid.setBackground(glass ? Ui.glass(this, 0x1CFFFFFF, 0x2EFFFFFF, dp(30)) : null);
+        apps.grid.setPadding(glass ? inner : edge, dp(glass ? 20 : 12), glass ? inner : edge, dp(glass ? 8 : 8));
+        apps.scroll.setBackground(null);
+        allApps.grid.setPadding(glass ? side : edge, dp(glass ? 18 : 12), glass ? side : edge, dp(8));
+        apps.strip.setPadding(bleed, dp(12), bleed, dp(8));
     }
 
     /** The greeting over the clock: "Good evening", plus ", name" when home.conf sets name=. */
@@ -882,7 +889,7 @@ public final class Home extends Activity {
     }
 
     private boolean iconChips() {
-        return "icons".equals(cfg.get(Config.CHIPS));
+        return glass() || "icons".equals(cfg.get(Config.CHIPS));
     }
 
     /** Text and padding for the chip style: the name always for text, on focus only for icons. */
@@ -1016,7 +1023,7 @@ public final class Home extends Activity {
         View focused = getCurrentFocus();
         String keep = focused instanceof Tile && ((Tile) focused).kind.equals(row.kind)
                 ? ((Tile) focused).item.id : null;
-        boolean gridMode = "grid".equals(cfg.get(Config.LAYOUT));
+        boolean gridMode = gridMode();
         ViewGroup target = gridMode ? row.grid : row.strip;
         row.strip.removeAllViews();
         row.grid.removeAllViews();
@@ -1110,7 +1117,7 @@ public final class Home extends Activity {
         // The library banner takes that space when it shows, and so does All apps. With Home
         // position › Bottom the spacer already puts the apps on the bottom edge: the shift is
         // measured from the display, not the page, and could push them below it.
-        int targetMargin = (!atBottom() && !"grid".equals(cfg.get(Config.LAYOUT)) && isInputsHidden()
+        int targetMargin = (!atBottom() && !gridMode() && isInputsHidden()
                 && !heroShown() && allApps.title.getVisibility() != View.VISIBLE) ? appRowShift() : 0;
         if (lp.topMargin != targetMargin) {
             lp.topMargin = targetMargin;
@@ -1185,7 +1192,7 @@ public final class Home extends Activity {
         if (glass()) {
             // Four tiles to a line, Apple TV style, whatever the screen's density.
             int avail = getResources().getDisplayMetrics().widthPixels - 2 * dp(56);
-            int w = (avail - 3 * dp(18)) / 4;
+            int w = (avail - 3 * dp(18)) / 4 * 4 / 5;
             return new int[] {w, w * 9 / 16};
         }
         switch (cfg.get(Config.TILES)) {

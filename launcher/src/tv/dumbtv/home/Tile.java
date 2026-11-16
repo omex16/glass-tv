@@ -41,6 +41,9 @@ final class Tile extends View {
     private final boolean glass;
     private final Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hairline = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint frame = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF well = new RectF();
+    private final Path wellClip = new Path();
 
     Tile(Context c, Item item, String kind, CharSequence title, int cardW, int cardH,
             String labels, int accent) {
@@ -107,6 +110,10 @@ final class Tile extends View {
         clip.reset();
         clip.addRoundRect(card, radius, radius, Path.Direction.CW);
         if (afterglow != null) afterglow.resize(cardW, cardH);
+        float pad = Ui.dp(getContext(), 5);
+        well.set(pad, pad, cardW - pad, cardH - pad);
+        wellClip.reset();
+        wellClip.addRoundRect(well, radius - pad, radius - pad, Path.Direction.CW);
         sheen.setShader(new LinearGradient(0, 0, 0, cardH * 0.6f,
                 0x40FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
         setPivotX(cardW / 2f);
@@ -131,6 +138,10 @@ final class Tile extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        if (glass) {
+            drawGlass(canvas);
+            return;
+        }
         Drawable banner = item.banner, icon = item.icon;
         canvas.save();
         canvas.clipPath(clip);
@@ -168,6 +179,53 @@ final class Tile extends View {
             ring.setPathEffect(moving ? new DashPathEffect(new float[] {stroke * 3, stroke * 2}, 0) : null);
             canvas.drawRoundRect(half, half, cardW - half, cardH - half, radius - half, radius - half, ring);
         }
+        if (moving) drawArrows(canvas);
+        boolean label = banner != null && (labelAlways || labelOnFocus && isFocused());
+        if (labelH > 0 && label) {
+            drawLine(canvas, under, cardW / 2f, cardH + labelH - Ui.dp(getContext(), 6));
+        }
+    }
+
+    /**
+     * Glass look: a frosted frame with a hairline edge, the app's art set inside it with a
+     * smaller radius, and on focus a brighter frame, a white edge and a sheen across the top.
+     */
+    private void drawGlass(Canvas canvas) {
+        Drawable banner = item.banner, icon = item.icon;
+        boolean on = isFocused() && !moving;
+        frame.setColor(on ? 0x52FFFFFF : 0x24FFFFFF);
+        canvas.drawRoundRect(card, radius, radius, frame);
+
+        int l = (int) well.left, t = (int) well.top, w = (int) well.width(), h = (int) well.height();
+        canvas.save();
+        canvas.clipPath(wellClip);
+        if (afterglow != null) {
+            canvas.translate(l, t);
+            afterglow.draw(canvas, icon, w, h);
+        } else if (banner != null) {
+            banner.setBounds(l, t, l + w, t + h);
+            banner.draw(canvas);
+        } else if (icon != null) {
+            canvas.drawRect(well, fill);
+            int size = h * 46 / 100;
+            int left = l + (w - size) / 2, top = t + h * 12 / 100;
+            icon.setBounds(left, top, left + size, top + size);
+            icon.draw(canvas);
+            drawLine(canvas, inner, l + w / 2f, t + h - h * 13 / 100f);
+        } else if (!Catalog.isApp(kind)) {
+            drawLine(canvas, inner, l + w / 2f, t + h / 2f - (inner.ascent() + inner.descent()) / 2);
+        }
+        if (moving) canvas.drawColor(0x99000000);
+        canvas.restore();
+
+        canvas.save();
+        canvas.clipPath(clip);
+        if (on) canvas.drawRect(card, sheen);
+        canvas.restore();
+        Paint edge = on || moving ? ring : hairline;
+        float half = edge.getStrokeWidth() / 2;
+        edge.setPathEffect(moving ? new DashPathEffect(new float[] {stroke * 3, stroke * 2}, 0) : null);
+        canvas.drawRoundRect(half, half, cardW - half, cardH - half, radius - half, radius - half, edge);
         if (moving) drawArrows(canvas);
         boolean label = banner != null && (labelAlways || labelOnFocus && isFocused());
         if (labelH > 0 && label) {

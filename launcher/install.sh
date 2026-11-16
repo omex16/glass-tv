@@ -17,6 +17,10 @@ GUARD=$PKG/$PKG.Guard
 OLD_GUARD=com.spocky.projengmenu/com.spocky.projengmenu.services.ProjectivyAccessibilityService
 ADB=${ADB:-adb}
 
+# Git Bash (MSYS2) rewrites /sdcard/... into C:/Program Files/Git/sdcard/... unless told not to;
+# without this the Glass install could not keep home.conf and the wallpaper.
+export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/sdcard;/data;/storage;/system"
+
 adb_() { "$ADB" ${ADB_SERIAL:+-s "$ADB_SERIAL"} "$@"; }
 sh_() { adb_ shell "$@" </dev/null; }
 installed() { sh_ pm path "$1" 2>/dev/null | grep -q '^package:'; }

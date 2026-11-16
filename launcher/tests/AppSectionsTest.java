@@ -83,6 +83,12 @@ public final class AppSectionsTest {
             Catalog.setShown(cfg, Catalog.APPS, a, false);
             ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog), "alpha", "gamma");
             Catalog.setShown(cfg, Catalog.APPS, a, true);
+            List<Item> six = Arrays.asList(app("p1", true), app("p2", true), app("p3", true),
+                    app("p4", true), app("p5", true), app("p6", true));
+            cfg.setList("apps.order", Arrays.asList("p5", "p1"));
+            ids(Catalog.visible(cfg, Catalog.APPS, six), "p5", "p1", "p2", "p3");
+            ids(Catalog.visible(cfg, Catalog.ALL_APPS, six), "p4", "p6");
+            cfg.setList("apps.order", Arrays.asList("gamma", "alpha"));
             cfg.set("glass", "off");
             cfg.set("all_apps", "off");
             ids(Catalog.visible(cfg, Catalog.INPUTS, Arrays.asList(c)), "gamma");

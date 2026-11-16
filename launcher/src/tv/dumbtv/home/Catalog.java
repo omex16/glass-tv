@@ -20,6 +20,8 @@ import java.util.Map;
 
 /** Where tiles come from, and which of them the user wants on the home screen. */
 final class Catalog {
+    /** Glass look: how many apps the dock holds. */
+    static final int DOCK = 4;
     static final String APPS = "apps", ALL_APPS = "allapps", INPUTS = "inputs";
 
     private Catalog() {}
@@ -131,13 +133,19 @@ final class Catalog {
     static List<Item> visible(Config cfg, String kind, List<Item> all, Map<String, Long> recent) {
         // Pinning, hiding and recent use only affect the pinned section. Child lock keeps apps
         // hidden there out of reach on this screen. Sort the full list by its displayed names.
+        boolean glass = "on".equals(cfg.get(Config.GLASS));
         if (ALL_APPS.equals(kind)) {
             List<Item> out = new ArrayList<>();
-            if (!"on".equals(cfg.get(Config.ALL_APPS)) || "on".equals(cfg.get(Config.LOCK))) return out;
-            // Glass look: the dock holds the pinned apps, so this section lists only the rest.
-            boolean glass = "on".equals(cfg.get(Config.GLASS));
-            for (Item it : all) {
-                if (!glass || !shown(cfg, APPS, it)) out.add(it);
+            if ("on".equals(cfg.get(Config.LOCK))) return out;
+            if (glass) {
+                // Glass look: the dock is the first DOCK pinned apps; every other app goes here.
+                List<Item> dock = visible(cfg, APPS, all, null);
+                for (Item it : all) {
+                    if (!dock.contains(it)) out.add(it);
+                }
+            } else {
+                if (!"on".equals(cfg.get(Config.ALL_APPS))) return out;
+                out.addAll(all);
             }
             Collator collator = Collator.getInstance();
             Collections.sort(out, (a, b) -> collator.compare(label(cfg, a).toString(), label(cfg, b).toString()));
@@ -151,6 +159,7 @@ final class Catalog {
         Collections.sort(out, (a, b) -> Integer.compare(rank(order, a.id), rank(order, b.id)));
         // The sort is stable, so apps with no record keep the user's order after the rest.
         if (recent != null) Collections.sort(out, (a, b) -> Recent.compare(recent, a.id, b.id));
+        if (glass && APPS.equals(kind) && out.size() > DOCK) return new ArrayList<>(out.subList(0, DOCK));
         return out;
     }
 
