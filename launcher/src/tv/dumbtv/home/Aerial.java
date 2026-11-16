@@ -7,6 +7,11 @@ import android.animation.PropertyValuesHolder;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.SurfaceTexture;
+import android.media.MediaPlayer;
+import android.view.Surface;
+import android.view.TextureView;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.view.Gravity;
@@ -31,6 +36,9 @@ import java.util.concurrent.RejectedExecutionException;
  * drifting slowly (a pan and a zoom) and cross-fading into the next, with a thin clock in the
  * corner. Home shows it after a few idle minutes and any key takes it away. Two pictures at most
  * are in memory, decoded at screen size in RGB 565: about 8 MB on a 1080p TV.
+ *
+ * Video clips (.mp4, .mkv, .webm) in the same folder take precedence, like Apple TV's aerials:
+ * played muted one after another, cropped to fill the screen, each fading in and out.
  */
 final class Aerial extends FrameLayout {
     static final long SHOW_MS = 14000, FADE_MS = 2200;
@@ -46,6 +54,17 @@ final class Aerial extends FrameLayout {
     private List<File> pictures = new ArrayList<>();
     private int index, top, generation;
     private boolean showing;
+    private final TextureView video;
+    private MediaPlayer player;
+    private Surface surface;
+    private List<File> clips = new ArrayList<>();
+    private int clip;
+    private final Runnable fadeOut = new Runnable() {
+        @Override
+        public void run() {
+            video.animate().alpha(0f).setDuration(1200).start();
+        }
+    };
 
     private final Runnable next = new Runnable() {
         @Override
@@ -66,6 +85,33 @@ final class Aerial extends FrameLayout {
             images[i].setAlpha(0f);
             addView(images[i], new LayoutParams(MATCH, MATCH));
         }
+        video = new TextureView(c);
+        video.setAlpha(0f);
+        video.setVisibility(View.GONE);
+        video.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override
+            public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
+                surface = new Surface(st);
+                if (showing && !clips.isEmpty()) play(clip);
+            }
+
+            @Override
+            public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) {
+                fit();
+            }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+                release();
+                if (surface != null) surface.release();
+                surface = null;
+                return true;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture st) {}
+        });
+        addView(video, new LayoutParams(MATCH, MATCH));
         View shade = new View(c);
         shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
                 new int[] {0x99000000, 0x00000000}));
@@ -95,17 +141,113 @@ final class Aerial extends FrameLayout {
 
     /** Shows the pictures in a fresh random order; false when there are none to show. */
     boolean start(List<File> files) {
-        if (files.isEmpty()) return false;
-        pictures = new ArrayList<>(files);
-        Collections.shuffle(pictures, random);
+        List<File> stills = new ArrayList<>(), moving = new ArrayList<>();
+        for (File f : files) (Config.isVideo(f) ? moving : stills).add(f);
+        if (stills.isEmpty() && moving.isEmpty()) return false;
         showing = true;
         generation++;
         setAlpha(0f);
         setVisibility(View.VISIBLE);
         animate().alpha(1f).setDuration(1200).start();
+        if (!moving.isEmpty()) {
+            clips = moving;
+            Collections.shuffle(clips, random);
+            clip = 0;
+            video.setVisibility(View.VISIBLE);
+            if (surface != null) play(0);
+            return true;
+        }
+        clips = new ArrayList<>();
+        pictures = stills;
+        Collections.shuffle(pictures, random);
         index = -1;
         load(0);
         return true;
+    }
+
+    /** Plays clip {@code i} muted; it fades out near its end and the next one fades in. */
+    private void play(int i) {
+        if (!showing || clips.isEmpty() || surface == null) return;
+        clip = Math.floorMod(i, clips.size());
+        release();
+        final int gen = generation;
+        MediaPlayer p = new MediaPlayer();
+        player = p;
+        try {
+            p.setDataSource(clips.get(clip).getPath());
+            p.setSurface(surface);
+            p.setVolume(0f, 0f);
+            p.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    if (gen != generation || mp != player) return;
+                    fit();
+                    mp.start();
+                    video.animate().alpha(1f).setDuration(1500).start();
+                    int left = mp.getDuration() - 1300;
+                    if (left > 0) ui.postDelayed(fadeOut, left);
+                }
+            });
+            p.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
+                @Override
+                public void onVideoSizeChanged(MediaPlayer mp, int w, int h) {
+                    fit();
+                }
+            });
+            p.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    if (gen == generation && showing) play(clip + 1);
+                }
+            });
+            p.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                @Override
+                public boolean onError(MediaPlayer mp, int what, int extra) {
+                    Keeper.note("screensaver clip failed: " + clips.get(clip).getName() + " " + what + "/" + extra);
+                    if (gen == generation && showing && clips.size() > 1) {
+                        ui.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (gen == generation) play(clip + 1);
+                            }
+                        }, 500);
+                    }
+                    return true;
+                }
+            });
+            p.prepareAsync();
+        } catch (java.io.IOException | RuntimeException e) {
+            Keeper.note("screensaver clip unreadable: " + clips.get(clip).getName());
+            release();
+        }
+    }
+
+    /** Crops the clip to fill the screen, like the pictures' centre crop. */
+    private void fit() {
+        MediaPlayer p = player;
+        if (p == null) return;
+        int vw, vh;
+        try {
+            vw = p.getVideoWidth();
+            vh = p.getVideoHeight();
+        } catch (IllegalStateException e) {
+            return;
+        }
+        int w = video.getWidth(), h = video.getHeight();
+        if (vw <= 0 || vh <= 0 || w <= 0 || h <= 0) return;
+        float scale = Math.max((float) w / vw, (float) h / vh);
+        float sx = vw * scale / w, sy = vh * scale / h;
+        Matrix m = new Matrix();
+        m.setScale(sx, sy, w / 2f, h / 2f);
+        video.setTransform(m);
+    }
+
+    private void release() {
+        ui.removeCallbacks(fadeOut);
+        if (player != null) {
+            player.release();
+            player = null;
+        }
     }
 
     void stop() {
@@ -113,12 +255,16 @@ final class Aerial extends FrameLayout {
         showing = false;
         generation++;
         ui.removeCallbacks(next);
+        release();
+        video.animate().cancel();
+        video.setAlpha(0f);
         animate().cancel();
         animate().alpha(0f).setDuration(250).withEndAction(new Runnable() {
             @Override
             public void run() {
                 if (showing) return;
                 setVisibility(View.GONE);
+                video.setVisibility(View.GONE);
                 for (int i = 0; i < 2; i++) {
                     if (drifts[i] != null) drifts[i].cancel();
                     images[i].setImageDrawable(null);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts your photos on the TV for the screensaver.
+# Puts your photos or aerial video clips on the TV for the screensaver.
 #   ./launcher/screensaver-photos.sh ~/Pictures/TV        every .jpg/.jpeg/.png/.webp in that folder
 #   ./launcher/screensaver-photos.sh --clear              removes the screensaver photos from the TV
 # Without photos of its own the screensaver shows your wallpapers.
@@ -16,7 +16,7 @@ src=${1:?usage: $0 <folder of photos> | --clear}
 "$ADB" shell mkdir -p "$DEST"
 n=0
 shopt -s nullglob nocaseglob
-for f in "$src"/*.jpg "$src"/*.jpeg "$src"/*.png "$src"/*.webp; do
+for f in "$src"/*.jpg "$src"/*.jpeg "$src"/*.png "$src"/*.webp "$src"/*.mp4 "$src"/*.mkv "$src"/*.webm "$src"/*.mov; do
   "$ADB" push "$f" "$DEST/" >/dev/null && n=$((n + 1)) && echo "  $(basename "$f")"
 done
-echo "$n photos on the TV"
+echo "$n files on the TV (video clips play first; photos only when there are no clips)"

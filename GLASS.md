@@ -21,6 +21,9 @@ After 3 idle minutes on the home screen your photos fill the screen, each drifti
 cross-fading into the next, with a clock in the corner. Any button brings Home back.
 
 - Change the delay or turn it off: Settings pill > Launcher settings > Screensaver.
-- Your own photos: `./launcher/screensaver-photos.sh <folder>`; without them it shows the wallpapers.
+- Your own photos or aerial video clips (.mp4): `./launcher/screensaver-photos.sh <folder>`.
+  Clips play muted one after another, fading in and out, like Apple TV's aerials; photos are
+  used when there are no clips, and the wallpapers when there is neither. 1080p H.264 clips
+  play best on a Fire TV Stick.
 - Fire TV's own screensaver starts after 5 minutes and covers this one: set
   Settings > Display & Sounds > Screen Saver > Start Time > Never.

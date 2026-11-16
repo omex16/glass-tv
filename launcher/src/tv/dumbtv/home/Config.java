@@ -438,14 +438,28 @@ final class Config {
     /** The screensaver's pictures: its own folder when it has any, else the wallpapers. */
     List<File> screensaverPictures() {
         List<File> out = new ArrayList<>();
-        addPictures(new File(dir, SCREENSAVER_DIR), out);
-        if (shared != null) addPictures(new File(shared, SCREENSAVER_DIR), out);
+        addScreensaver(new File(dir, SCREENSAVER_DIR), out);
+        if (shared != null) addScreensaver(new File(shared, SCREENSAVER_DIR), out);
         if (out.isEmpty()) out.addAll(wallpapers());
         if (out.isEmpty()) {
             File one = wallpaper();
             if (one != null) out.add(one);
         }
         return out;
+    }
+
+    /** A video clip the screensaver can play. */
+    static boolean isVideo(File f) {
+        String n = f.getName().toLowerCase(Locale.ROOT);
+        return n.endsWith(".mp4") || n.endsWith(".mkv") || n.endsWith(".webm") || n.endsWith(".mov");
+    }
+
+    /** Pictures and video clips in {@code folder}, for the screensaver. */
+    private static void addScreensaver(File folder, List<File> out) {
+        addPictures(folder, out);
+        File[] files = folder.listFiles();
+        if (files == null) return;
+        for (File f : files) if (f.isFile() && isVideo(f)) out.add(f);
     }
 
     /** The library folder that holds a library.conf: the app's own first, then the media one. */
