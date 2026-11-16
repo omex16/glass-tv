@@ -123,7 +123,14 @@ final class Config {
     /** The banner of hand-picked titles from {@link Library}; hidden anyway while it has none. */
     static final Choice LIBRARY = new Choice("library", "Library banner", "on",
             new String[] {"on", "off"}, new String[] {"Shown", "Hidden"});
-    static final Choice[] CHOICES = {ACCENT, TILES, LAYOUT, POSITION, ORDER, ALL_APPS, LABELS, CLOCK, MEMORY, INPUTS, SWITCH, BACKGROUND, DIM, ROTATE, LOCK, TILE_STYLE, CHIPS, LIBRARY};
+    /**
+     * Apple TV style finish: frosted pill chips, a greeting over a thin clock, a frosted dock
+     * band behind the apps and a white glass sheen on the focused tile instead of the ring.
+     * Translucent fills only, no blur, so it costs nothing on a 1 GB stick.
+     */
+    static final Choice GLASS = new Choice("glass", "Glass look", "on",
+            new String[] {"on", "off"}, new String[] {"On", "Off"});
+    static final Choice[] CHOICES = {GLASS, ACCENT, TILES, LAYOUT, POSITION, ORDER, ALL_APPS, LABELS, CLOCK, MEMORY, INPUTS, SWITCH, BACKGROUND, DIM, ROTATE, LOCK, TILE_STYLE, CHIPS, LIBRARY};
 
     /** Folder of wallpapers, next to home.conf, that Background › Image file rotates through. */
     static final String WALLPAPERS = "wallpapers";

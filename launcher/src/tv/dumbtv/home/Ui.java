@@ -68,6 +68,32 @@ final class Ui {
         return d;
     }
 
+    /** Frosted glass: a translucent white fill with a hairline edge, no blur. */
+    static GradientDrawable glass(Context c, int fill, int edge, float radius) {
+        GradientDrawable d = round(fill, radius);
+        d.setStroke(Math.max(1, dp(c, 1)), edge);
+        return d;
+    }
+
+    /** A glass pill: frosted at rest, near-white with dark ink when focused. */
+    static void glassStyle(TextView v, float radius) {
+        Context c = v.getContext();
+        StateListDrawable bg = new StateListDrawable();
+        bg.addState(new int[] {android.R.attr.state_focused}, glass(c, 0xF2FFFFFF, 0xFFFFFFFF, radius));
+        bg.addState(new int[0], glass(c, 0x1FFFFFFF, 0x33FFFFFF, radius));
+        v.setBackground(bg);
+        v.setTextColor(focused(0xFF111114, 0xE6FFFFFF));
+    }
+
+    /** {@link #chipIcon} for a glass pill: both layers white at rest, dark when focused. */
+    static Drawable glassIcon(Drawable shape, Drawable mark, int size) {
+        shape.mutate().setTintList(focused(0xFF111114, 0xE6FFFFFF));
+        mark.mutate().setTintList(focused(0xFF111114, 0xE6FFFFFF));
+        LayerDrawable d = new LayerDrawable(new Drawable[] {shape, mark});
+        d.setBounds(0, 0, size, size);
+        return d;
+    }
+
     private static ColorStateList focused(int on, int off) {
         return new ColorStateList(new int[][] {{android.R.attr.state_focused}, {}}, new int[] {on, off});
     }

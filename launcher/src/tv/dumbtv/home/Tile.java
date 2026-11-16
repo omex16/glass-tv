@@ -3,15 +3,19 @@ package tv.dumbtv.home;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
+import android.graphics.LinearGradient;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.media.tv.TvInputManager;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 
 /** A card drawn in one pass: banner, or icon plus name, or an input name; focus ring on top. */
 final class Tile extends View {
@@ -33,6 +37,10 @@ final class Tile extends View {
     private final TextPaint under = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private boolean moving;
     private final AfterglowTile afterglow;
+    /** Options › Glass look: white sheen and shadow on focus, hairline edge at rest. */
+    private final boolean glass;
+    private final Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint hairline = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     Tile(Context c, Item item, String kind, CharSequence title, int cardW, int cardH,
             String labels, int accent) {
@@ -48,13 +56,25 @@ final class Tile extends View {
         labelH = app && afterglow == null ? Ui.dp(c, 26) : 0;
         labelAlways = "always".equals(labels);
         labelOnFocus = "focus".equals(labels);
-        radius = Ui.dp(c, 10);
-        stroke = Ui.dp(c, afterglow == null ? 2.5f : 1f);
+        glass = "on".equals(Config.get(c).get(Config.GLASS));
+        radius = Ui.dp(c, glass ? 16 : 10);
+        stroke = Ui.dp(c, glass ? 1.5f : afterglow == null ? 2.5f : 1f);
 
-        fill.setColor(app ? Ui.SURFACE : 0xFF17181B);
+        fill.setColor(glass ? 0x26FFFFFF : app ? Ui.SURFACE : 0xFF17181B);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(stroke);
-        ring.setColor(accent);
+        ring.setColor(glass ? 0xCCFFFFFF : accent);
+        hairline.setStyle(Paint.Style.STROKE);
+        hairline.setStrokeWidth(Math.max(1, Ui.dp(c, 1)));
+        hairline.setColor(0x24FFFFFF);
+        if (glass) {
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override
+                public void getOutline(View view, Outline outline) {
+                    outline.setRoundRect(0, 0, Tile.this.cardW, Tile.this.cardH, radius);
+                }
+            });
+        }
         dot.setColor(0xFF34C759);
         inner.setColor(Ui.TEXT);
         inner.setTypeface(Ui.MEDIUM);
@@ -87,6 +107,8 @@ final class Tile extends View {
         clip.reset();
         clip.addRoundRect(card, radius, radius, Path.Direction.CW);
         if (afterglow != null) afterglow.resize(cardW, cardH);
+        sheen.setShader(new LinearGradient(0, 0, 0, cardH * 0.6f,
+                0x40FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
         setPivotX(cardW / 2f);
         setPivotY(cardH / 2f);
     }
@@ -95,11 +117,14 @@ final class Tile extends View {
     protected void onFocusChanged(boolean focused, int direction, Rect previous) {
         super.onFocusChanged(focused, direction, previous);
         animate().cancel();
+        float scale = glass ? 1.1f : FOCUS_SCALE;
         if (focused) {
-            animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(110).start();
+            animate().scaleX(scale).scaleY(scale).translationZ(glass ? Ui.dp(getContext(), 14) : 0)
+                    .setDuration(glass ? 160 : 110).start();
         } else {
             setScaleX(1f);
             setScaleY(1f);
+            setTranslationZ(0);
         }
         invalidate();
     }
@@ -124,8 +149,13 @@ final class Tile extends View {
         } else if (!Catalog.isApp(kind)) {
             drawLine(canvas, inner, cardW / 2f, cardH / 2f - (inner.ascent() + inner.descent()) / 2);
         }
+        if (glass && isFocused() && !moving) canvas.drawRect(card, sheen);
         if (moving) canvas.drawColor(0x99000000);
         canvas.restore();
+        if (glass && !isFocused() && !moving) {
+            float h = hairline.getStrokeWidth() / 2;
+            canvas.drawRoundRect(h, h, cardW - h, cardH - h, radius - h, radius - h, hairline);
+        }
 
         if (afterglow != null) afterglow.edge(canvas, cardW, cardH, radius);
 

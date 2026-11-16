@@ -61,6 +61,8 @@ public final class Home extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ExecutorService colorIo = Executors.newSingleThreadExecutor();
     private final List<TextView> chips = new ArrayList<>();
+    /** Glass look only: opens Fire OS's network screen directly. */
+    private TextView wifiChip;
     private Config cfg;
     private TvInputManager tv;
     private int applied = -1, appsGeneration;
@@ -75,7 +77,7 @@ public final class Home extends Activity {
     private View shade;
     private View tint;
     private LinearLayout head;
-    private TextView clock, date;
+    private TextView clock, date, greeting;
     private Meter meter;
     private Row apps, allApps, inputs;
     private Hero hero;
@@ -193,7 +195,8 @@ public final class Home extends Activity {
 
         void setVisible(boolean on) {
             boolean gridMode = "grid".equals(cfg.get(Config.LAYOUT));
-            title.setVisibility(on ? View.VISIBLE : View.GONE);
+            boolean dock = Catalog.APPS.equals(kind) && "on".equals(cfg.get(Config.GLASS));
+            title.setVisibility(on && !dock ? View.VISIBLE : View.GONE);
             scroll.setVisibility(on && !gridMode ? View.VISIBLE : View.GONE);
             grid.setVisibility(on && gridMode ? View.VISIBLE : View.GONE);
         }
@@ -656,9 +659,13 @@ public final class Home extends Activity {
         head.setPadding(dp(56), 0, dp(56), dp(12));
         LinearLayout when = new LinearLayout(this);
         when.setOrientation(LinearLayout.VERTICAL);
+        greeting = Ui.text(this, 17, 0xCCFFFFFF, Ui.MEDIUM);
+        greeting.setPadding(dp(4), 0, 0, dp(6));
+        greeting.setVisibility(View.GONE);
         clock = Ui.text(this, 52, Ui.TEXT, Ui.LIGHT);
         date = Ui.text(this, 15, Ui.MUTED, Ui.MEDIUM);
         date.setPadding(dp(2), dp(8), 0, 0);
+        when.addView(greeting);
         when.addView(clock);
         when.addView(date);
         meter = new Meter(this);
@@ -672,6 +679,9 @@ public final class Home extends Activity {
         head.addView(when, new LinearLayout.LayoutParams(0, WRAP, 1f));
         head.addView(chip(getString(R.string.options), R.drawable.chip_options, R.drawable.chip_options_mark,
                 v -> startActivity(new Intent(this, Options.class))));
+        wifiChip = chip(getString(R.string.wifi), R.drawable.chip_wifi, R.drawable.chip_wifi_mark,
+                v -> openWifi());
+        head.addView(wifiChip);
         head.addView(chip(getString(R.string.settings), R.drawable.chip_settings, R.drawable.chip_settings_mark,
                 v -> openSettings()));
         column.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
@@ -787,6 +797,49 @@ public final class Home extends Activity {
         return v;
     }
 
+    private static final android.graphics.Typeface THIN =
+            android.graphics.Typeface.create("sans-serif-thin", android.graphics.Typeface.NORMAL);
+
+    private boolean glass() {
+        return "on".equals(cfg.get(Config.GLASS));
+    }
+
+    /** Glass look: a frosted band behind the apps row (or grid), like the Apple TV dock. */
+    private void dock(boolean glass) {
+        int side = dp(36);
+        for (View v : new View[] {apps.scroll, apps.grid}) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
+            lp.leftMargin = glass ? side : 0;
+            lp.rightMargin = glass ? side : 0;
+            lp.topMargin = glass ? dp(14) : 0;
+            v.setLayoutParams(lp);
+            v.setBackground(glass ? Ui.glass(this, 0x1CFFFFFF, 0x2EFFFFFF, dp(30)) : null);
+        }
+        int edge = dp(56), bleed = dp(14);
+        apps.scroll.setPadding(glass ? edge - bleed - side : edge - bleed, 0,
+                glass ? edge - bleed - side : edge - bleed, 0);
+        apps.strip.setPadding(bleed, dp(glass ? 22 : 12), bleed, dp(glass ? 14 : 8));
+        apps.grid.setPadding(glass ? edge - side : edge, dp(glass ? 22 : 12),
+                glass ? edge - side : edge, dp(glass ? 14 : 8));
+    }
+
+    /** The greeting over the clock: "Good evening", plus ", name" when home.conf sets name=. */
+    private String greetingText(Date now) {
+        int h = Integer.parseInt(DateFormat.format("H", now).toString());
+        String part = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon"
+                : h < 22 ? "Good evening" : "Good night";
+        String name = cfg.get("name", "");
+        return name.isEmpty() ? part : part + ", " + name;
+    }
+
+    private void openWifi() {
+        Intent fire = new Intent("com.amazon.device.settings.action.ADD_NETWORK")
+                .setClassName("com.amazon.tv.settings.v2", "com.amazon.tv.settings.v2.tv.network.NetworkActivity")
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        boolean found = fire.resolveActivity(getPackageManager()) != null;
+        launch(found ? fire : new Intent(Settings.ACTION_WIFI_SETTINGS), null);
+    }
+
     private boolean iconChips() {
         return "icons".equals(cfg.get(Config.CHIPS));
     }
@@ -808,14 +861,26 @@ public final class Home extends Activity {
         applied = cfg.version();
         int accent = cfg.accent();
         boolean icons = iconChips();
+        boolean glass = glass();
         for (TextView c : chips) {
-            Ui.focusStyle(c, accent, 0x14FFFFFF, dp(icons ? 21 : 18));
             int[] art = (int[]) c.getTag();
-            c.setCompoundDrawablesRelative(icons ? Ui.chipIcon(getDrawable(art[0]), getDrawable(art[1]),
-                    accent, dp(22)) : null, null, null, null);
+            if (glass) {
+                Ui.glassStyle(c, dp(icons ? 21 : 20));
+                c.setCompoundDrawablesRelative(icons ? Ui.glassIcon(getDrawable(art[0]), getDrawable(art[1]),
+                        dp(22)) : null, null, null, null);
+            } else {
+                Ui.focusStyle(c, accent, 0x14FFFFFF, dp(icons ? 21 : 18));
+                c.setCompoundDrawablesRelative(icons ? Ui.chipIcon(getDrawable(art[0]), getDrawable(art[1]),
+                        accent, dp(22)) : null, null, null, null);
+            }
             chipLook(c, c.isFocused());
-            c.setVisibility(locked() ? View.GONE : View.VISIBLE);
+            c.setVisibility(locked() || c == wifiChip && !glass ? View.GONE : View.VISIBLE);
         }
+        greeting.setVisibility(glass ? View.VISIBLE : View.GONE);
+        clock.setTypeface(glass ? THIN : Ui.LIGHT);
+        clock.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, glass ? 76 : 52);
+        clock.setLetterSpacing(glass ? -0.02f : 0f);
+        dock(glass);
         meter.setVisibility("on".equals(cfg.get(Config.MEMORY)) ? View.VISIBLE : View.GONE);
         meter.setAccent(accent);
         hero.setAccent(accent);
@@ -1167,6 +1232,7 @@ public final class Home extends Activity {
             clock.setText(DateFormat.format("h:mm", now));
             clock.append(half);
         }
+        if (greeting.getVisibility() == View.VISIBLE) greeting.setText(greetingText(now));
         Locale locale = Locale.getDefault();
         date.setText(DateFormat.format(DateFormat.getBestDateTimePattern(locale, "EEEEdMMMM"), now));
         if (meter.getVisibility() == View.VISIBLE) {

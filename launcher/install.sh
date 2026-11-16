@@ -3,6 +3,7 @@
 #   ./launcher/install.sh            download the release APK (checksum-verified), install, take over HOME
 #   ./launcher/install.sh --build    build from source instead (needs a JDK and the Android SDK)
 #   ./launcher/install.sh --undo     hand HOME back to Amazon's launcher
+#   ./launcher/install.sh --glass    install the Glass build from omex16/glass-tv's latest release
 # Pick the device with ADB_SERIAL when more than one is connected.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -27,7 +28,8 @@ case ${1:-} in
   "") ;;
   --build) mode=build ;;
   --undo) mode=undo ;;
-  *) echo "usage: $0 [--build | --undo]" >&2; exit 2 ;;
+  --glass) mode=glass ;;
+  *) echo "usage: $0 [--build | --glass | --undo]" >&2; exit 2 ;;
 esac
 
 command -v "$ADB" >/dev/null || { echo "error: adb not found — install Android platform-tools" >&2; exit 1; }
@@ -97,8 +99,30 @@ install_apk() {
   out=$(adb_ install -r "$APK" 2>&1 | grep -m1 -E 'Success|Failure|failed' || true)
 }
 
+GLASS_URL=https://github.com/omex16/glass-tv/releases/latest/download
+FILES=/sdcard/Android/data/$PKG/files
+
 if [[ $mode == build ]]; then
   build_apk
+elif [[ $mode == glass ]]; then
+  mkdir -p build
+  APK=build/glass-home.apk
+  echo "downloading the Glass build"
+  curl -fL --retry 4 --retry-delay 3 --retry-all-errors --connect-timeout 20 --progress-bar \
+    -o "$APK" "$GLASS_URL/dumbtv-home.apk" || { echo "error: could not download $GLASS_URL/dumbtv-home.apk" >&2; exit 1; }
+  want=$(curl -fsL --retry 4 "$GLASS_URL/dumbtv-home.apk.sha256" | cut -d' ' -f1)
+  got=$(sha256 "$APK")
+  [[ -n $want && $got == "$want" ]] || { echo "error: checksum mismatch for $APK (got $got, want $want) — not installing" >&2; exit 1; }
+  echo "checksum ok"
+  # The release is signed with another key, so it has to go first. Uninstalling deletes its
+  # files folder, so keep home.conf and the wallpapers and put them back afterwards.
+  if installed $PKG && ! sh_ dumpsys package $PKG | grep -q 'versionName=.*glass'; then
+    echo "replacing the release build (your settings and wallpaper are kept)"
+    keep=build/keep
+    rm -rf "$keep"; mkdir -p "$keep"
+    adb_ pull "$FILES/." "$keep" >/dev/null 2>&1 || true
+    adb_ uninstall $PKG >/dev/null
+  fi
 else
   mkdir -p build
   APK=build/dumbtv-home-$VERSION.apk
@@ -115,6 +139,11 @@ else
 fi
 
 install_apk
+if [[ $mode == glass && -d build/keep ]] && [[ -n $(ls -A build/keep 2>/dev/null) ]]; then
+  sh_ mkdir -p "$FILES"
+  adb_ push build/keep/. "$FILES/" >/dev/null && echo "restored your settings and wallpaper"
+  rm -rf build/keep
+fi
 # Releases up to 1.1 were built for Android 9+. On Fire OS 6 (sdk 25) fall back to a
 # source build; the default build already targets sdk 25.
 if [[ $mode == release && $out == *INSTALL_FAILED_OLDER_SDK* ]]; then
