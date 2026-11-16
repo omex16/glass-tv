@@ -195,7 +195,7 @@ public final class Home extends Activity {
 
         void setVisible(boolean on) {
             boolean gridMode = gridMode();
-            boolean dock = Catalog.APPS.equals(kind) && "on".equals(cfg.get(Config.GLASS));
+            boolean dock = Catalog.isApp(kind) && "on".equals(cfg.get(Config.GLASS));
             title.setVisibility(on && !dock ? View.VISIBLE : View.GONE);
             scroll.setVisibility(on && !gridMode ? View.VISIBLE : View.GONE);
             grid.setVisibility(on && gridMode ? View.VISIBLE : View.GONE);

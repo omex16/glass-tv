@@ -79,10 +79,12 @@ public final class AppSectionsTest {
             cfg.set("all_apps", "on");
             cfg.set("glass", "on");
             ids(Catalog.visible(cfg, Catalog.APPS, catalog), "alpha", "beta");
-            ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog), "gamma");
-            Catalog.setShown(cfg, Catalog.APPS, a, false);
-            ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog), "alpha", "gamma");
-            Catalog.setShown(cfg, Catalog.APPS, a, true);
+            // Below the dock: the rest of the shown apps; gamma has no TV banner, so it stays hidden.
+            ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog));
+            Catalog.setShown(cfg, Catalog.APPS, c, true);
+            ids(Catalog.visible(cfg, Catalog.APPS, catalog), "gamma", "alpha", "beta");
+            Catalog.setShown(cfg, Catalog.APPS, c, false);
+            ids(Catalog.visible(cfg, Catalog.INPUTS, Arrays.asList(c)), "gamma");
             List<Item> six = Arrays.asList(app("p1", true), app("p2", true), app("p3", true),
                     app("p4", true), app("p5", true), app("p6", true));
             cfg.setList("apps.order", Arrays.asList("p5", "p1"));

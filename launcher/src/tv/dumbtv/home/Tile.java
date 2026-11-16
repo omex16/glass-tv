@@ -63,13 +63,13 @@ final class Tile extends View {
         radius = Ui.dp(c, glass ? 16 : 10);
         stroke = Ui.dp(c, glass ? 1.5f : afterglow == null ? 2.5f : 1f);
 
-        fill.setColor(glass ? 0x26FFFFFF : app ? Ui.SURFACE : 0xFF17181B);
+        fill.setColor(glass ? 0x0FFFFFFF : app ? Ui.SURFACE : 0xFF17181B);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(stroke);
         ring.setColor(glass ? 0xCCFFFFFF : accent);
         hairline.setStyle(Paint.Style.STROKE);
         hairline.setStrokeWidth(Math.max(1, Ui.dp(c, 1)));
-        hairline.setColor(0x24FFFFFF);
+        hairline.setColor(0x38FFFFFF);
         if (glass) {
             setOutlineProvider(new ViewOutlineProvider() {
                 @Override
@@ -110,7 +110,7 @@ final class Tile extends View {
         clip.reset();
         clip.addRoundRect(card, radius, radius, Path.Direction.CW);
         if (afterglow != null) afterglow.resize(cardW, cardH);
-        float pad = Ui.dp(getContext(), 5);
+        float pad = Ui.dp(getContext(), 3);
         well.set(pad, pad, cardW - pad, cardH - pad);
         wellClip.reset();
         wellClip.addRoundRect(well, radius - pad, radius - pad, Path.Direction.CW);
@@ -193,7 +193,7 @@ final class Tile extends View {
     private void drawGlass(Canvas canvas) {
         Drawable banner = item.banner, icon = item.icon;
         boolean on = isFocused() && !moving;
-        frame.setColor(on ? 0x52FFFFFF : 0x24FFFFFF);
+        frame.setColor(on ? 0x59FFFFFF : 0x14FFFFFF);
         canvas.drawRoundRect(card, radius, radius, frame);
 
         int l = (int) well.left, t = (int) well.top, w = (int) well.width(), h = (int) well.height();

@@ -138,11 +138,12 @@ final class Catalog {
             List<Item> out = new ArrayList<>();
             if ("on".equals(cfg.get(Config.LOCK))) return out;
             if (glass) {
-                // Glass look: the dock is the first DOCK pinned apps; every other app goes here.
-                List<Item> dock = visible(cfg, APPS, all, null);
-                for (Item it : all) {
-                    if (!dock.contains(it)) out.add(it);
-                }
+                // Glass look: the dock is the first DOCK shown apps and this section the rest of
+                // them, in the same order. Amazon's own apps without a TV banner stay hidden here
+                // as they do in the plain look, until Options shows them.
+                List<Item> shown = pinned(cfg, APPS, all, null);
+                if (shown.size() > DOCK) out.addAll(shown.subList(DOCK, shown.size()));
+                return out;
             } else {
                 if (!"on".equals(cfg.get(Config.ALL_APPS))) return out;
                 out.addAll(all);
@@ -151,6 +152,13 @@ final class Catalog {
             Collections.sort(out, (a, b) -> collator.compare(label(cfg, a).toString(), label(cfg, b).toString()));
             return out;
         }
+        List<Item> out = pinned(cfg, kind, all, recent);
+        if (glass && APPS.equals(kind) && out.size() > DOCK) return new ArrayList<>(out.subList(0, DOCK));
+        return out;
+    }
+
+    /** The shown items of {@code kind} in the user's order, most recent first when {@code recent} is set. */
+    private static List<Item> pinned(Config cfg, String kind, List<Item> all, Map<String, Long> recent) {
         List<String> order = cfg.list(kind + ".order");
         List<Item> out = new ArrayList<>();
         for (Item it : all) {
@@ -159,7 +167,6 @@ final class Catalog {
         Collections.sort(out, (a, b) -> Integer.compare(rank(order, a.id), rank(order, b.id)));
         // The sort is stable, so apps with no record keep the user's order after the rest.
         if (recent != null) Collections.sort(out, (a, b) -> Recent.compare(recent, a.id, b.id));
-        if (glass && APPS.equals(kind) && out.size() > DOCK) return new ArrayList<>(out.subList(0, DOCK));
         return out;
     }
 
