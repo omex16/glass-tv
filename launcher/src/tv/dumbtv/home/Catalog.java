@@ -134,7 +134,11 @@ final class Catalog {
         if (ALL_APPS.equals(kind)) {
             List<Item> out = new ArrayList<>();
             if (!"on".equals(cfg.get(Config.ALL_APPS)) || "on".equals(cfg.get(Config.LOCK))) return out;
-            out.addAll(all);
+            // Glass look: the dock holds the pinned apps, so this section lists only the rest.
+            boolean glass = "on".equals(cfg.get(Config.GLASS));
+            for (Item it : all) {
+                if (!glass || !shown(cfg, APPS, it)) out.add(it);
+            }
             Collator collator = Collator.getInstance();
             Collections.sort(out, (a, b) -> collator.compare(label(cfg, a).toString(), label(cfg, b).toString()));
             return out;

@@ -34,6 +34,8 @@ public final class AppSectionsTest {
             List<Item> catalog = Arrays.asList(a, b, c);
             check("off".equals(cfg.get(Config.ALL_APPS)), "all apps off by default");
             check(Arrays.asList(Config.CHOICES).contains(Config.ALL_APPS), "available in Options");
+            // These checks are for the plain look; the Glass look is checked at the end.
+            cfg.set("glass", "off");
             ids(Catalog.visible(cfg, Catalog.APPS, catalog), "alpha", "beta");
             ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog));
 
@@ -72,9 +74,20 @@ public final class AppSectionsTest {
             ids(Catalog.visible(reloaded, Catalog.APPS, catalog), "alpha", "beta");
             ids(Catalog.visible(reloaded, Catalog.ALL_APPS, catalog));
             ids(catalog, "alpha", "beta", "gamma");
+
+            // Glass look: the dock holds the pinned apps, so All apps lists only the others.
+            cfg.set("all_apps", "on");
+            cfg.set("glass", "on");
+            ids(Catalog.visible(cfg, Catalog.APPS, catalog), "alpha", "beta");
+            ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog), "gamma");
+            Catalog.setShown(cfg, Catalog.APPS, a, false);
+            ids(Catalog.visible(cfg, Catalog.ALL_APPS, catalog), "alpha", "gamma");
+            Catalog.setShown(cfg, Catalog.APPS, a, true);
+            cfg.set("glass", "off");
+            cfg.set("all_apps", "off");
             ids(Catalog.visible(cfg, Catalog.INPUTS, Arrays.asList(c)), "gamma");
             check(Catalog.isApp(Catalog.ALL_APPS) && !Catalog.isApp(Catalog.INPUTS), "tile types");
-            System.out.println("AppSectionsTest passed (default, pin/unpin, full catalog, order, lock)");
+            System.out.println("AppSectionsTest passed (default, pin/unpin, full catalog, order, lock, glass dock)");
         } finally {
             File[] files = dir.listFiles();
             if (files != null) for (File file : files) check(file.delete(), "remove settings");

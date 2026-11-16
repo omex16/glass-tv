@@ -9,6 +9,9 @@
     <string name="options">Options</string>
     <string name="settings">Settings</string>
     <string name="wifi">Wi-Fi</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="launcher_settings">Launcher settings</string>
+    <string name="system_settings">System settings</string>
     <string name="row_apps">Apps</string>
     <string name="row_inputs">Inputs</string>
     <string name="row_all_apps">All apps</string>

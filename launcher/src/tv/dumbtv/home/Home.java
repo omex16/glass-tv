@@ -62,7 +62,7 @@ public final class Home extends Activity {
     private final ExecutorService colorIo = Executors.newSingleThreadExecutor();
     private final List<TextView> chips = new ArrayList<>();
     /** Glass look only: opens Fire OS's network screen directly. */
-    private TextView wifiChip;
+    private TextView wifiChip, btChip, optionsChip;
     private Config cfg;
     private TvInputManager tv;
     private int applied = -1, appsGeneration;
@@ -677,13 +677,19 @@ public final class Home extends Activity {
         under.leftMargin = dp(2);
         when.addView(meter, under);
         head.addView(when, new LinearLayout.LayoutParams(0, WRAP, 1f));
-        head.addView(chip(getString(R.string.options), R.drawable.chip_options, R.drawable.chip_options_mark,
-                v -> startActivity(new Intent(this, Options.class))));
         wifiChip = chip(getString(R.string.wifi), R.drawable.chip_wifi, R.drawable.chip_wifi_mark,
                 v -> openWifi());
         head.addView(wifiChip);
+        btChip = chip(getString(R.string.bluetooth), R.drawable.chip_bluetooth, R.drawable.chip_bluetooth_mark,
+                v -> openBluetooth());
+        head.addView(btChip);
+        optionsChip = chip(getString(R.string.options), R.drawable.chip_options, R.drawable.chip_options_mark,
+                v -> startActivity(new Intent(this, Options.class)));
+        head.addView(optionsChip);
         head.addView(chip(getString(R.string.settings), R.drawable.chip_settings, R.drawable.chip_settings_mark,
-                v -> openSettings()));
+                v -> {
+                    if (glass()) glassSettings(); else openSettings();
+                }));
         column.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
         // Home position › Bottom: the page fills the screen (setFillViewport), and this stretch
         // takes what the banner and the rows leave of it, so they sit on the bottom edge. When
@@ -840,6 +846,41 @@ public final class Home extends Activity {
         launch(found ? fire : new Intent(Settings.ACTION_WIFI_SETTINGS), null);
     }
 
+    private void openBluetooth() {
+        Intent fire = new Intent("com.amazon.device.settings.action.CONTROLLERS")
+                .setClassName("com.amazon.tv.settings.v2",
+                        "com.amazon.tv.settings.v2.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity")
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        boolean found = fire.resolveActivity(getPackageManager()) != null;
+        launch(found ? fire : new Intent(Settings.ACTION_BLUETOOTH_SETTINGS), null);
+    }
+
+    /** Glass look's Settings pill: this launcher's own settings first, then the TV's. */
+    private void glassSettings() {
+        Intent tvSettings = new Intent(Intent.ACTION_MAIN)
+                .addCategory("android.intent.category.LEANBACK_SETTINGS");
+        final List<Item> sections = FireSettings.applies(getPackageManager(), tvSettings)
+                ? FireSettings.sections(this) : new ArrayList<Item>();
+        CharSequence[] labels = new CharSequence[sections.size() + (sections.isEmpty() ? 2 : 1)];
+        labels[0] = getString(R.string.launcher_settings);
+        for (int i = 0; i < sections.size(); i++) labels[i + 1] = sections.get(i).label;
+        if (sections.isEmpty()) labels[1] = getString(R.string.system_settings);
+        new AlertDialog.Builder(this, Ui.DIALOG)
+                .setTitle(R.string.settings)
+                .setItems(labels, (d, which) -> {
+                    if (which == 0) {
+                        startActivity(new Intent(this, Options.class));
+                    } else if (sections.isEmpty()) {
+                        openSettings();
+                    } else {
+                        Item s = sections.get(which - 1);
+                        if (Guard.AMAZON.equals(s.id)) Guard.pause();
+                        launch(new Intent(s.intent), null);
+                    }
+                })
+                .show();
+    }
+
     private boolean iconChips() {
         return "icons".equals(cfg.get(Config.CHIPS));
     }
@@ -874,7 +915,8 @@ public final class Home extends Activity {
                         accent, dp(22)) : null, null, null, null);
             }
             chipLook(c, c.isFocused());
-            c.setVisibility(locked() || c == wifiChip && !glass ? View.GONE : View.VISIBLE);
+            boolean glassOnly = c == wifiChip || c == btChip, plainOnly = c == optionsChip;
+            c.setVisibility(locked() || glassOnly && !glass || plainOnly && glass ? View.GONE : View.VISIBLE);
         }
         greeting.setVisibility(glass ? View.VISIBLE : View.GONE);
         clock.setTypeface(glass ? THIN : Ui.LIGHT);
@@ -1140,6 +1182,12 @@ public final class Home extends Activity {
     }
 
     private int[] cardSize() {
+        if (glass()) {
+            // Four tiles to a line, Apple TV style, whatever the screen's density.
+            int avail = getResources().getDisplayMetrics().widthPixels - 2 * dp(56);
+            int w = (avail - 3 * dp(18)) / 4;
+            return new int[] {w, w * 9 / 16};
+        }
         switch (cfg.get(Config.TILES)) {
             case "small":
                 return new int[] {dp(144), dp(81)};
