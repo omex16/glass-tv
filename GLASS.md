@@ -14,3 +14,13 @@ Install (Git Bash, TV connected over adb):
 
 Every push to main that touches launcher/ builds a new APK and publishes it as the latest release.
 Undo: `./launcher/install.sh --undo` hands HOME back to Amazon.
+
+## Screensaver
+
+After 3 idle minutes on the home screen your photos fill the screen, each drifting slowly and
+cross-fading into the next, with a clock in the corner. Any button brings Home back.
+
+- Change the delay or turn it off: Settings pill > Launcher settings > Screensaver.
+- Your own photos: `./launcher/screensaver-photos.sh <folder>`; without them it shows the wallpapers.
+- Fire TV's own screensaver starts after 5 minutes and covers this one: set
+  Settings > Display & Sounds > Screen Saver > Start Time > Never.

@@ -72,6 +72,17 @@ public final class Home extends Activity {
     private String lastFocusedKind;
     private final Map<String, String> lastIds = new HashMap<>();
     private FrameLayout root;
+    /** The screensaver, over everything else once the home screen has been idle a while. */
+    private Aerial aerial;
+    private final Runnable idle = new Runnable() {
+        @Override
+        public void run() {
+            if (resumed && moving == null && !aerial.showing()) {
+                aerial.start(cfg.screensaverPictures());
+                tick();
+            }
+        }
+    };
     private LinearLayout column;
     private ImageView wall;
     private View shade;
@@ -332,6 +343,15 @@ public final class Home extends Activity {
         f.addAction(Intent.ACTION_TIMEZONE_CHANGED);
         registerReceiver(time, f);
         tick();
+        resetIdle();
+    }
+
+    /** Starts the screensaver countdown again from now, following Options › Screensaver. */
+    private void resetIdle() {
+        ui.removeCallbacks(idle);
+        String minutes = cfg.get(Config.SCREENSAVER);
+        if (!resumed || "off".equals(minutes)) return;
+        ui.postDelayed(idle, Long.parseLong(minutes) * 60_000L);
     }
 
     @Override
@@ -345,6 +365,8 @@ public final class Home extends Activity {
         resumed = false;
         inFront = false;
         hero.stop();
+        ui.removeCallbacks(idle);
+        aerial.stop();
         stopColorAnimation();
         targetColor = 0;
         unregisterReceiver(time);
@@ -380,6 +402,8 @@ public final class Home extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        aerial.stop();
+        resetIdle();
         if (moving != null) stopMoving();
         if (resumed) focusFirst();
     }
@@ -391,6 +415,13 @@ public final class Home extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if (aerial != null && aerial.showing()) {
+            // Any key wakes the home screen and does nothing else, as on Apple TV.
+            if (e.getAction() == KeyEvent.ACTION_DOWN) aerial.stop();
+            resetIdle();
+            return true;
+        }
+        if (e.getAction() == KeyEvent.ACTION_DOWN) resetIdle();
         if (moving == null) return super.dispatchKeyEvent(e);
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
             switch (e.getKeyCode()) {
@@ -714,6 +745,8 @@ public final class Home extends Activity {
         allApps = new Row(Catalog.ALL_APPS, getString(R.string.row_all_apps), column);
         allApps.setVisible(false);
         inputs = new Row(Catalog.INPUTS, getString(R.string.row_inputs), column);
+        aerial = new Aerial(this, ui, io);
+        root.addView(aerial, new FrameLayout.LayoutParams(MATCH, MATCH));
         return root;
     }
 
@@ -1288,6 +1321,10 @@ public final class Home extends Activity {
             clock.append(half);
         }
         if (greeting.getVisibility() == View.VISIBLE) greeting.setText(greetingText(now));
+        if (aerial != null && aerial.showing()) {
+            aerial.setTime(clock.getText(), DateFormat.format(
+                    DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), now));
+        }
         Locale locale = Locale.getDefault();
         date.setText(DateFormat.format(DateFormat.getBestDateTimePattern(locale, "EEEEdMMMM"), now));
         if (meter.getVisibility() == View.VISIBLE) {

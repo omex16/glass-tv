@@ -130,7 +130,15 @@ final class Config {
      */
     static final Choice GLASS = new Choice("glass", "Glass look", "on",
             new String[] {"on", "off"}, new String[] {"On", "Off"});
-    static final Choice[] CHOICES = {GLASS, ACCENT, TILES, LAYOUT, POSITION, ORDER, ALL_APPS, LABELS, CLOCK, MEMORY, INPUTS, SWITCH, BACKGROUND, DIM, ROTATE, LOCK, TILE_STYLE, CHIPS, LIBRARY};
+    /**
+     * Minutes of no key presses on the home screen before the screensaver: the pictures in the
+     * screensaver folder next to home.conf, else the wallpapers. Off turns it off.
+     */
+    static final Choice SCREENSAVER = new Choice("screensaver", "Screensaver", "3",
+            new String[] {"off", "1", "3", "5", "10"},
+            new String[] {"Off", "After 1 minute", "After 3 minutes", "After 5 minutes", "After 10 minutes"});
+    static final String SCREENSAVER_DIR = "screensaver";
+    static final Choice[] CHOICES = {GLASS, SCREENSAVER, ACCENT, TILES, LAYOUT, POSITION, ORDER, ALL_APPS, LABELS, CLOCK, MEMORY, INPUTS, SWITCH, BACKGROUND, DIM, ROTATE, LOCK, TILE_STYLE, CHIPS, LIBRARY};
 
     /** Folder of wallpapers, next to home.conf, that Background › Image file rotates through. */
     static final String WALLPAPERS = "wallpapers";
@@ -424,6 +432,19 @@ final class Config {
                 return byName != 0 ? byName : a.getPath().compareTo(b.getPath());
             }
         });
+        return out;
+    }
+
+    /** The screensaver's pictures: its own folder when it has any, else the wallpapers. */
+    List<File> screensaverPictures() {
+        List<File> out = new ArrayList<>();
+        addPictures(new File(dir, SCREENSAVER_DIR), out);
+        if (shared != null) addPictures(new File(shared, SCREENSAVER_DIR), out);
+        if (out.isEmpty()) out.addAll(wallpapers());
+        if (out.isEmpty()) {
+            File one = wallpaper();
+            if (one != null) out.add(one);
+        }
         return out;
     }
 
